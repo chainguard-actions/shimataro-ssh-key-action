@@ -1,0 +1,46 @@
+name: Test SSH key installation with custom name
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Generate test SSH key
+        id: gen-key
+        run: |
+          ssh-keygen -t ed25519 -f /tmp/test_key_ed25519 -N "" -q
+          PRIVATE_KEY=$(cat /tmp/test_key_ed25519)
+          echo "private_key<<EOF" >> $GITHUB_OUTPUT
+          echo "$PRIVATE_KEY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      - id: action
+        uses: .
+        with:
+          key: ${{ steps.gen-key.outputs.private_key }}
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV+uQt6ZHmZa5vdkRkyvlSEid0SimoXOMDbGKiAa6YlM5T072h/bIxukAHNygScEXg444Wv+b/6iqol/spR2TbyvO9dssQgFPexigtzwSiWXttVc/siJa1MS5y9UXdeJnEn9fIfwIDAQAB"
+          name: id_ed25519
+      - name: Assert custom-named SSH key file exists
+        run: |
+          echo "Checking if SSH key was installed with custom name..."
+          if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
+            echo "FAIL: SSH key file not found at ~/.ssh/id_ed25519"
+            exit 1
+          fi
+          echo "PASS: SSH key file exists at ~/.ssh/id_ed25519"
+      - name: Assert default key name was NOT created
+        run: |
+          if [ -f "$HOME/.ssh/id_rsa" ]; then
+            echo "FAIL: default key file ~/.ssh/id_rsa should not exist"
+            exit 1
+          fi
+          echo "PASS: default key file ~/.ssh/id_rsa does not exist (correct)"
+      - name: Assert key file permissions
+        run: |
+          PERMS=$(stat -c "%a" "$HOME/.ssh/id_ed25519")
+          echo "~/.ssh/id_ed25519 permissions: $PERMS"
+          if [ "$PERMS" != "600" ]; then
+            echo "FAIL: expected key file permissions to be 600, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: key file has correct permissions (600)"

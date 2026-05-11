@@ -1,0 +1,53 @@
+name: Test SSH key installation with if_key_exists=ignore
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Generate test SSH keys
+        id: gen-key
+        run: |
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key1 -N "" -q
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key2 -N "" -q
+          PRIVATE_KEY1=$(cat /tmp/test_key1)
+          PRIVATE_KEY2=$(cat /tmp/test_key2)
+          echo "private_key1<<EOF" >> $GITHUB_OUTPUT
+          echo "$PRIVATE_KEY1" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "private_key2<<EOF" >> $GITHUB_OUTPUT
+          echo "$PRIVATE_KEY2" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Install SSH key first time
+        uses: .
+        with:
+          key: ${{ steps.gen-key.outputs.private_key1 }}
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV+uQt6ZHmZa5vdkRkyvlSEid0SimoXOMDbGKiAa6YlM5T072h/bIxukAHNygScEXg444Wv+b/6iqol/spR2TbyvO9dssQgFPexigtzwSiWXttVc/siJa1MS5y9UXdeJnEn9fIfwIDAQAB"
+          name: id_rsa
+          if_key_exists: replace
+      - name: Capture first key fingerprint
+        id: first-key
+        run: |
+          FINGERPRINT=$(ssh-keygen -lf "$HOME/.ssh/id_rsa" | awk '{print $2}')
+          echo "fingerprint=$FINGERPRINT" >> $GITHUB_OUTPUT
+          echo "First key fingerprint: $FINGERPRINT"
+      - name: Install SSH key second time with if_key_exists=ignore
+        uses: .
+        with:
+          key: ${{ steps.gen-key.outputs.private_key2 }}
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV+uQt6ZHmZa5vdkRkyvlSEid0SimoXOMDbGKiAa6YlM5T072h/bIxukAHNygScEXg444Wv+b/6iqol/spR2TbyvO9dssQgFPexigtzwSiWXttVc/siJa1MS5y9UXdeJnEn9fIfwIDAQAB"
+          name: id_rsa
+          if_key_exists: ignore
+      - name: Assert original key was preserved (not replaced)
+        env:
+          FIRST_FINGERPRINT: ${{ steps.first-key.outputs.fingerprint }}
+        run: |
+          CURRENT_FINGERPRINT=$(ssh-keygen -lf "$HOME/.ssh/id_rsa" | awk '{print $2}')
+          echo "First key fingerprint:   $FIRST_FINGERPRINT"
+          echo "Current key fingerprint: $CURRENT_FINGERPRINT"
+          if [ "$CURRENT_FINGERPRINT" != "$FIRST_FINGERPRINT" ]; then
+            echo "FAIL: key was replaced despite if_key_exists=ignore"
+            exit 1
+          fi
+          echo "PASS: original key was preserved when if_key_exists=ignore"

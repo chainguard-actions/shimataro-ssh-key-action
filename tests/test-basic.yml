@@ -1,0 +1,57 @@
+name: Test basic SSH key installation
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Generate test SSH key
+        id: gen-key
+        run: |
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -q
+          PRIVATE_KEY=$(cat /tmp/test_key)
+          echo "private_key<<EOF" >> $GITHUB_OUTPUT
+          echo "$PRIVATE_KEY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      - id: action
+        uses: .
+        with:
+          key: ${{ steps.gen-key.outputs.private_key }}
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV+uQt6ZHmZa5vdkRkyvlSEid0SimoXOMDbGKiAa6YlM5T072h/bIxukAHNygScEXg444Wv+b/6iqol/spR2TbyvO9dssQgFPexigtzwSiWXttVc/siJa1MS5y9UXdeJnEn9fIfwIDAQAB"
+          name: id_rsa
+      - name: Assert SSH key file exists
+        run: |
+          echo "Checking if SSH key was installed..."
+          if [ ! -f "$HOME/.ssh/id_rsa" ]; then
+            echo "FAIL: SSH key file not found at ~/.ssh/id_rsa"
+            exit 1
+          fi
+          echo "PASS: SSH key file exists at ~/.ssh/id_rsa"
+      - name: Assert known_hosts file exists
+        run: |
+          echo "Checking if known_hosts was created..."
+          if [ ! -f "$HOME/.ssh/known_hosts" ]; then
+            echo "FAIL: known_hosts file not found"
+            exit 1
+          fi
+          echo "PASS: known_hosts file exists"
+          cat "$HOME/.ssh/known_hosts"
+      - name: Assert SSH directory permissions
+        run: |
+          PERMS=$(stat -c "%a" "$HOME/.ssh")
+          echo "~/.ssh permissions: $PERMS"
+          if [ "$PERMS" != "700" ]; then
+            echo "FAIL: expected ~/.ssh permissions to be 700, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: ~/.ssh has correct permissions (700)"
+      - name: Assert key file permissions
+        run: |
+          PERMS=$(stat -c "%a" "$HOME/.ssh/id_rsa")
+          echo "~/.ssh/id_rsa permissions: $PERMS"
+          if [ "$PERMS" != "600" ]; then
+            echo "FAIL: expected key file permissions to be 600, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: key file has correct permissions (600)"
