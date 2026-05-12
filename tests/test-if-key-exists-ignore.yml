@@ -1,0 +1,41 @@
+name: Test if_key_exists=ignore keeps existing key
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pre-install a marker key file
+        run: |
+          mkdir -p "$HOME/.ssh"
+          echo "ORIGINAL_KEY_CONTENT" > "$HOME/.ssh/id_rsa"
+          chmod 600 "$HOME/.ssh/id_rsa"
+
+      - id: action
+        uses: .
+        with:
+          key: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+            QyNTUxOQAAACBY2fNDFJpVTKMKMCMFHFJMhpMkuH3jBMTqBjhDRmFnbAAAAJiMjMCYjI
+            zAAAAAtzc2gtZWQyNTUxOQAAACBY2fNDFJpVTKMKMCMFHFJMhpMkuH3jBMTqBjhDRmFn
+            bAAAAEDummy+TestKey+NotReal+ForCIOnly+Y2fNDFJpVTKMKMCMFHFJMhpMkuH3jBM
+            TqBjhDRmFnbAAAADXRlc3RAZXhhbXBsZQECAwQF
+            -----END OPENSSH PRIVATE KEY-----
+          known_hosts: |
+            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+          name: id_rsa
+          if_key_exists: ignore
+
+      - name: Assert original key was preserved (not overwritten)
+        run: |
+          echo "Checking that original key content was preserved..."
+          CONTENT=$(cat "$HOME/.ssh/id_rsa")
+          echo "Content: $CONTENT"
+          if [ "$CONTENT" != "ORIGINAL_KEY_CONTENT" ]; then
+            echo "FAIL: key was overwritten, expected 'ORIGINAL_KEY_CONTENT'"
+            exit 1
+          fi
+          echo "PASS: original key preserved"

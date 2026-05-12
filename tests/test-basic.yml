@@ -1,0 +1,51 @@
+name: Test basic SSH key installation
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          key: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+            QyNTUxOQAAACBY2fNDFJpVTKMKMCMFHFJMhpMkuH3jBMTqBjhDRmFnbAAAAJiMjMCYjI
+            zAAAAAtzc2gtZWQyNTUxOQAAACBY2fNDFJpVTKMKMCMFHFJMhpMkuH3jBMTqBjhDRmFn
+            bAAAAEDummy+TestKey+NotReal+ForCIOnly+Y2fNDFJpVTKMKMCMFHFJMhpMkuH3jBM
+            TqBjhDRmFnbAAAADXRlc3RAZXhhbXBsZQECAwQF
+            -----END OPENSSH PRIVATE KEY-----
+          known_hosts: |
+            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+          name: id_rsa
+          if_key_exists: replace
+
+      - name: Assert key file exists
+        run: |
+          echo "Checking ~/.ssh/id_rsa exists..."
+          if [ ! -f "$HOME/.ssh/id_rsa" ]; then
+            echo "FAIL: ~/.ssh/id_rsa not found"
+            exit 1
+          fi
+          echo "PASS: key file exists"
+
+      - name: Assert known_hosts file exists
+        run: |
+          echo "Checking ~/.ssh/known_hosts exists..."
+          if [ ! -f "$HOME/.ssh/known_hosts" ]; then
+            echo "FAIL: ~/.ssh/known_hosts not found"
+            exit 1
+          fi
+          echo "PASS: known_hosts file exists"
+
+      - name: Assert known_hosts contains github.com
+        run: |
+          echo "Checking known_hosts contains github.com..."
+          if ! grep -q "github.com" "$HOME/.ssh/known_hosts"; then
+            echo "FAIL: github.com not found in known_hosts"
+            exit 1
+          fi
+          echo "PASS: github.com found in known_hosts"

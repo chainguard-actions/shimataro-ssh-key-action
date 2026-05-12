@@ -1,0 +1,42 @@
+name: Test SSH key installation with custom name
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          key: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+            QyNTUxOQAAACBY2fNDFJpVTKMKMCMFHFJMhpMkuH3jBMTqBjhDRmFnbAAAAJiMjMCYjI
+            zAAAAAtzc2gtZWQyNTUxOQAAACBY2fNDFJpVTKMKMCMFHFJMhpMkuH3jBMTqBjhDRmFn
+            bAAAAEDummy+TestKey+NotReal+ForCIOnly+Y2fNDFJpVTKMKMCMFHFJMhpMkuH3jBM
+            TqBjhDRmFnbAAAADXRlc3RAZXhhbXBsZQECAwQF
+            -----END OPENSSH PRIVATE KEY-----
+          known_hosts: |
+            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+          name: id_deploy
+          if_key_exists: replace
+
+      - name: Assert custom-named key file exists
+        run: |
+          echo "Checking ~/.ssh/id_deploy exists..."
+          if [ ! -f "$HOME/.ssh/id_deploy" ]; then
+            echo "FAIL: ~/.ssh/id_deploy not found"
+            exit 1
+          fi
+          echo "PASS: custom-named key file exists"
+
+      - name: Assert default key name was not created
+        run: |
+          echo "Checking ~/.ssh/id_rsa does NOT exist (custom name was used)..."
+          if [ -f "$HOME/.ssh/id_rsa" ]; then
+            echo "FAIL: ~/.ssh/id_rsa should not exist when custom name is used"
+            exit 1
+          fi
+          echo "PASS: default key name not created"
