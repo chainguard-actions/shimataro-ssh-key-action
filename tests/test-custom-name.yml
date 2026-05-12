@@ -1,0 +1,45 @@
+name: Test SSH key installation with custom name
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Generate test SSH key pair
+        id: keygen
+        run: |
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          PRIVATE_KEY=$(cat /tmp/test_key)
+          echo "private_key<<EOF" >> $GITHUB_OUTPUT
+          echo "$PRIVATE_KEY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - id: action
+        uses: .
+        with:
+          key: ${{ steps.keygen.outputs.private_key }}
+          name: id_custom
+          known_hosts: unnecessary
+
+      - name: Assert SSH key was installed with custom name
+        run: |
+          echo "Checking ~/.ssh/id_custom exists..."
+          if [ ! -f "$HOME/.ssh/id_custom" ]; then
+            echo "FAIL: ~/.ssh/id_custom not found"
+            exit 1
+          fi
+          echo "Checking ~/.ssh/id_rsa does NOT exist (default name not used)..."
+          if [ -f "$HOME/.ssh/id_rsa" ]; then
+            echo "FAIL: ~/.ssh/id_rsa should not exist when custom name is used"
+            exit 1
+          fi
+          echo "Checking ~/.ssh/id_custom permissions..."
+          PERMS=$(stat -c "%a" "$HOME/.ssh/id_custom")
+          echo "Permissions: $PERMS"
+          if [ "$PERMS" != "600" ]; then
+            echo "FAIL: expected permissions 600, got $PERMS"
+            exit 1
+          fi
+          echo "PASS"

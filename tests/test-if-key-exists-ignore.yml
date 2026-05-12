@@ -1,0 +1,49 @@
+name: Test SSH key installation with if_key_exists=ignore
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Generate test SSH key pair
+        id: keygen
+        run: |
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          PRIVATE_KEY=$(cat /tmp/test_key)
+          echo "private_key<<EOF" >> $GITHUB_OUTPUT
+          echo "$PRIVATE_KEY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: First installation
+        uses: .
+        with:
+          key: ${{ steps.keygen.outputs.private_key }}
+          known_hosts: unnecessary
+          if_key_exists: ignore
+
+      - name: Assert first key installed
+        run: |
+          if [ ! -f "$HOME/.ssh/id_rsa" ]; then
+            echo "FAIL: ~/.ssh/id_rsa not found after first install"
+            exit 1
+          fi
+          echo "First install OK"
+          # Record modification time of the key
+          stat "$HOME/.ssh/id_rsa"
+
+      - name: Second installation (should be ignored)
+        uses: .
+        with:
+          key: ${{ steps.keygen.outputs.private_key }}
+          known_hosts: unnecessary
+          if_key_exists: ignore
+
+      - name: Assert second installation was ignored gracefully
+        run: |
+          if [ ! -f "$HOME/.ssh/id_rsa" ]; then
+            echo "FAIL: ~/.ssh/id_rsa not found after second install"
+            exit 1
+          fi
+          echo "PASS: second install with if_key_exists=ignore succeeded without error"

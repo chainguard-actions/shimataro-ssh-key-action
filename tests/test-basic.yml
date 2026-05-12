@@ -1,0 +1,50 @@
+name: Test basic SSH key installation
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Generate test SSH key pair
+        id: keygen
+        run: |
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          PRIVATE_KEY=$(cat /tmp/test_key)
+          echo "private_key<<EOF" >> $GITHUB_OUTPUT
+          echo "$PRIVATE_KEY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          # Get the public key fingerprint for known_hosts (use localhost as placeholder)
+          ssh-keyscan github.com 2>/dev/null > /tmp/known_hosts_content || echo "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC..." > /tmp/known_hosts_content
+          KNOWN_HOSTS=$(cat /tmp/known_hosts_content)
+          echo "known_hosts<<EOF" >> $GITHUB_OUTPUT
+          echo "$KNOWN_HOSTS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - id: action
+        uses: .
+        with:
+          key: ${{ steps.keygen.outputs.private_key }}
+          known_hosts: ${{ steps.keygen.outputs.known_hosts }}
+
+      - name: Assert SSH key was installed
+        run: |
+          echo "Checking ~/.ssh/id_rsa exists..."
+          if [ ! -f "$HOME/.ssh/id_rsa" ]; then
+            echo "FAIL: ~/.ssh/id_rsa not found"
+            exit 1
+          fi
+          echo "Checking ~/.ssh/id_rsa permissions..."
+          PERMS=$(stat -c "%a" "$HOME/.ssh/id_rsa")
+          echo "Permissions: $PERMS"
+          if [ "$PERMS" != "600" ]; then
+            echo "FAIL: expected permissions 600, got $PERMS"
+            exit 1
+          fi
+          echo "Checking ~/.ssh/known_hosts exists..."
+          if [ ! -f "$HOME/.ssh/known_hosts" ]; then
+            echo "FAIL: ~/.ssh/known_hosts not found"
+            exit 1
+          fi
+          echo "PASS"

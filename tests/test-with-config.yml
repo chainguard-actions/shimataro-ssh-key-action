@@ -1,0 +1,43 @@
+name: Test SSH key installation with SSH config
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Generate test SSH key pair
+        id: keygen
+        run: |
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          PRIVATE_KEY=$(cat /tmp/test_key)
+          echo "private_key<<EOF" >> $GITHUB_OUTPUT
+          echo "$PRIVATE_KEY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - id: action
+        uses: .
+        with:
+          key: ${{ steps.keygen.outputs.private_key }}
+          known_hosts: unnecessary
+          config: |
+            Host example.com
+              IdentityFile ~/.ssh/id_rsa
+              User git
+
+      - name: Assert SSH config was written
+        run: |
+          echo "Checking ~/.ssh/config exists..."
+          if [ ! -f "$HOME/.ssh/config" ]; then
+            echo "FAIL: ~/.ssh/config not found"
+            exit 1
+          fi
+          echo "Contents of ~/.ssh/config:"
+          cat "$HOME/.ssh/config"
+          echo "Checking config contains expected Host entry..."
+          if ! grep -q "Host example.com" "$HOME/.ssh/config"; then
+            echo "FAIL: ~/.ssh/config does not contain 'Host example.com'"
+            exit 1
+          fi
+          echo "PASS"
