@@ -1,0 +1,47 @@
+name: Test basic SSH key installation
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Generate test SSH key
+        run: |
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -q
+          echo "TEST_SSH_KEY<<EOF" >> $GITHUB_ENV
+          cat /tmp/test_key >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - id: action
+        uses: .
+        with:
+          key: ${{ env.TEST_SSH_KEY }}
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA1bkTJhCkYluMoUCpjcDWipaHAILoikn+LK9LpYwNamluuIrNWK00T2i5faeYnHzxiLRFr6f3XtARoJI9+4C3bQdp5wFMNoA1VE4/LX4geB8B8k/I4Q5Zj5ggAGDsHqmge8="
+
+      - name: Assert SSH key file exists
+        run: |
+          if [ ! -f "$HOME/.ssh/id_rsa" ]; then
+            echo "FAIL: SSH key file ~/.ssh/id_rsa does not exist"
+            exit 1
+          fi
+          echo "PASS: SSH key file exists at ~/.ssh/id_rsa"
+
+      - name: Assert SSH key file has correct permissions
+        run: |
+          PERMS=$(stat -c "%a" "$HOME/.ssh/id_rsa")
+          echo "actual permissions: $PERMS"
+          if [ "$PERMS" != "600" ]; then
+            echo "FAIL: expected permissions 600, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: SSH key file has correct permissions"
+
+      - name: Assert known_hosts file exists
+        run: |
+          if [ ! -f "$HOME/.ssh/known_hosts" ]; then
+            echo "FAIL: known_hosts file does not exist"
+            exit 1
+          fi
+          echo "PASS: known_hosts file exists"

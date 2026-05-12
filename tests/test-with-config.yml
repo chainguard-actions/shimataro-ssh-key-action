@@ -1,0 +1,43 @@
+name: Test SSH key installation with SSH config
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Generate test SSH key
+        run: |
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -q
+          echo "TEST_SSH_KEY<<EOF" >> $GITHUB_ENV
+          cat /tmp/test_key >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - id: action
+        uses: .
+        with:
+          key: ${{ env.TEST_SSH_KEY }}
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA1bkTJhCkYluMoUCpjcDWipaHAILoikn+LK9LpYwNamluuIrNWK00T2i5faeYnHzxiLRFr6f3XtARoJI9+4C3bQdp5wFMNoA1VE4/LX4geB8B8k/I4Q5Zj5ggAGDsHqmge8="
+          config: |
+            Host github.com
+              User git
+              IdentityFile ~/.ssh/id_rsa
+              StrictHostKeyChecking yes
+
+      - name: Assert SSH config file exists
+        run: |
+          if [ ! -f "$HOME/.ssh/config" ]; then
+            echo "FAIL: SSH config file ~/.ssh/config does not exist"
+            exit 1
+          fi
+          echo "PASS: SSH config file exists"
+
+      - name: Assert SSH config contains expected content
+        run: |
+          if ! grep -q "Host github.com" "$HOME/.ssh/config"; then
+            echo "FAIL: SSH config does not contain expected 'Host github.com' entry"
+            cat "$HOME/.ssh/config"
+            exit 1
+          fi
+          echo "PASS: SSH config contains expected content"
