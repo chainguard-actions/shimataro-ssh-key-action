@@ -1,0 +1,49 @@
+name: Test basic SSH key installation
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          key: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+            QyNTUxOQAAACBY2fNtMBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFBQHMQAAAABY2fNt
+            MBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFBQHMQAAAAtzc2gtZWQyNTUxOQAAACBY2f
+            NtMBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFBQHMQAAAABY2fNtMBMHMQpbFBQHMQpb
+            FBQHMQpbFBQHMQpbFBQHMQAAAEBY2fNtMBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFB
+            QHMQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
+            -----END OPENSSH PRIVATE KEY-----
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV9wHgS38o8/Las9ifjdwbznuVqltzacInwbqEWWAWVpAoNa7PE0bzXpTZlcILec9Cb3dOdXynlAU+voTYmaWm51mKOwiBiA0X2OcjXzSlU0GrCSLjrhkZYv4/he3OhenV0ut+HXstvo9+IQ8/UfsmH5xGiWwwSDaOzizqe6bDZR4d8eVoENfpRM4U="
+
+      - name: Assert key file exists
+        run: |
+          echo "Checking ~/.ssh/id_rsa exists..."
+          if [ ! -f "$HOME/.ssh/id_rsa" ]; then
+            echo "FAIL: ~/.ssh/id_rsa not found"
+            exit 1
+          fi
+          echo "PASS: key file exists"
+
+      - name: Assert key file permissions
+        run: |
+          PERMS=$(stat -c "%a" "$HOME/.ssh/id_rsa")
+          echo "actual permissions: $PERMS"
+          if [ "$PERMS" != "600" ]; then
+            echo "FAIL: expected permissions 600, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: key file has correct permissions"
+
+      - name: Assert known_hosts file exists
+        run: |
+          if [ ! -f "$HOME/.ssh/known_hosts" ]; then
+            echo "FAIL: ~/.ssh/known_hosts not found"
+            exit 1
+          fi
+          echo "PASS: known_hosts file exists"

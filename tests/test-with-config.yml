@@ -1,0 +1,46 @@
+name: Test SSH key installation with config
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          key: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+            QyNTUxOQAAACBY2fNtMBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFBQHMQAAAABY2fNt
+            MBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFBQHMQAAAAtzc2gtZWQyNTUxOQAAACBY2f
+            NtMBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFBQHMQAAAABY2fNtMBMHMQpbFBQHMQpb
+            FBQHMQpbFBQHMQpbFBQHMQAAAEBY2fNtMBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFB
+            QHMQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
+            -----END OPENSSH PRIVATE KEY-----
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV9wHgS38o8/Las9ifjdwbznuVqltzacInwbqEWWAWVpAoNa7PE0bzXpTZlcILec9Cb3dOdXynlAU+voTYmaWm51mKOwiBiA0X2OcjXzSlU0GrCSLjrhkZYv4/he3OhenV0ut+HXstvo9+IQ8/UfsmH5xGiWwwSDaOzizqe6bDZR4d8eVoENfpRM4U="
+          config: |
+            Host github.com
+              IdentityFile ~/.ssh/id_rsa
+              StrictHostKeyChecking yes
+
+      - name: Assert SSH config file exists
+        run: |
+          echo "Checking ~/.ssh/config exists..."
+          if [ ! -f "$HOME/.ssh/config" ]; then
+            echo "FAIL: ~/.ssh/config not found"
+            exit 1
+          fi
+          echo "PASS: SSH config file exists"
+
+      - name: Assert SSH config contains expected content
+        run: |
+          CONFIG_CONTENT=$(cat "$HOME/.ssh/config")
+          echo "Config content:"
+          echo "$CONFIG_CONTENT"
+          if ! grep -q "github.com" "$HOME/.ssh/config"; then
+            echo "FAIL: config does not contain 'github.com'"
+            exit 1
+          fi
+          echo "PASS: SSH config contains expected content"
