@@ -1,7 +1,7 @@
 {
   "owner": "shimataro",
   "name": "ssh-key-action",
-  "visibility": "internal",
+  "visibility": "public",
   "description": "Install SSH key in ~/.ssh",
   "block_publish": false
 }
