@@ -10,18 +10,20 @@ jobs:
       - name: Generate test SSH key pair
         id: keygen
         run: |
-          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -q
           PRIVATE_KEY=$(cat /tmp/test_key)
           echo "private_key<<EOF" >> $GITHUB_OUTPUT
           echo "$PRIVATE_KEY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: First installation
+      - name: Install SSH key first time
+        id: first-install
         uses: .
         with:
           key: ${{ steps.keygen.outputs.private_key }}
-          known_hosts: unnecessary
-          if_key_exists: ignore
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA0BdHfcOuW0oFjFWtiq5cymLCoLaqLfi3i/+V/rF0skBwQAA5kxqKL6RedVBqz/08noKUpQiqsl0XQe9/7NluSZXlpY2raAlcyDTAVmUZjjy5COLK3Rt1s1GnXn1s0ne/QQJKl1HzdbackMt8qfgzHoGaL7SnBZbcPalh5x+T+MdW7pH3PASeJCMGAQAA=="
+          name: id_rsa
+          if_key_exists: fail
 
       - name: Assert first key installed
         run: |
@@ -29,21 +31,21 @@ jobs:
             echo "FAIL: ~/.ssh/id_rsa not found after first install"
             exit 1
           fi
-          echo "First install OK"
-          # Record modification time of the key
-          stat "$HOME/.ssh/id_rsa"
+          echo "PASS: First key installed successfully"
 
-      - name: Second installation (should be ignored)
+      - name: Install SSH key second time with if_key_exists=ignore
+        id: second-install
         uses: .
         with:
           key: ${{ steps.keygen.outputs.private_key }}
-          known_hosts: unnecessary
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA0BdHfcOuW0oFjFWtiq5cymLCoLaqLfi3i/+V/rF0skBwQAA5kxqKL6RedVBqz/08noKUpQiqsl0XQe9/7NluSZXlpY2raAlcyDTAVmUZjjy5COLK3Rt1s1GnXn1s0ne/QQJKl1HzdbackMt8qfgzHoGaL7SnBZbcPalh5x+T+MdW7pH3PASeJCMGAQAA=="
+          name: id_rsa
           if_key_exists: ignore
 
-      - name: Assert second installation was ignored gracefully
+      - name: Assert key still exists after ignore
         run: |
           if [ ! -f "$HOME/.ssh/id_rsa" ]; then
-            echo "FAIL: ~/.ssh/id_rsa not found after second install"
+            echo "FAIL: ~/.ssh/id_rsa not found after second install with ignore"
             exit 1
           fi
-          echo "PASS: second install with if_key_exists=ignore succeeded without error"
+          echo "PASS: Key still exists after if_key_exists=ignore"

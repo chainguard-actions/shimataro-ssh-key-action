@@ -10,7 +10,7 @@ jobs:
       - name: Generate test SSH key pair
         id: keygen
         run: |
-          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -q
           PRIVATE_KEY=$(cat /tmp/test_key)
           echo "private_key<<EOF" >> $GITHUB_OUTPUT
           echo "$PRIVATE_KEY" >> $GITHUB_OUTPUT
@@ -20,24 +20,43 @@ jobs:
         uses: .
         with:
           key: ${{ steps.keygen.outputs.private_key }}
-          known_hosts: unnecessary
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA0BdHfcOuW0oFjFWtiq5cymLCoLaqLfi3i/+V/rF0skBwQAA5kxqKL6RedVBqz/08noKUpQiqsl0XQe9/7NluSZXlpY2raAlcyDTAVmUZjjy5COLK3Rt1s1GnXn1s0ne/QQJKl1HzdbackMt8qfgzHoGaL7SnBZbcPalh5x+T+MdW7pH3PASeJCMGAQAA=="
+          name: id_rsa
           config: |
-            Host example.com
+            Host github.com
               IdentityFile ~/.ssh/id_rsa
               User git
 
-      - name: Assert SSH config was written
+      - name: Assert SSH key file exists
         run: |
-          echo "Checking ~/.ssh/config exists..."
+          if [ ! -f "$HOME/.ssh/id_rsa" ]; then
+            echo "FAIL: ~/.ssh/id_rsa not found"
+            exit 1
+          fi
+          echo "PASS: SSH key file exists"
+
+      - name: Assert SSH config file exists and contains expected content
+        run: |
           if [ ! -f "$HOME/.ssh/config" ]; then
             echo "FAIL: ~/.ssh/config not found"
             exit 1
           fi
-          echo "Contents of ~/.ssh/config:"
+          echo "PASS: ~/.ssh/config exists"
+          echo "--- config contents ---"
           cat "$HOME/.ssh/config"
-          echo "Checking config contains expected Host entry..."
-          if ! grep -q "Host example.com" "$HOME/.ssh/config"; then
-            echo "FAIL: ~/.ssh/config does not contain 'Host example.com'"
+          echo "--- end config ---"
+          if ! grep -q "github.com" "$HOME/.ssh/config"; then
+            echo "FAIL: ~/.ssh/config does not contain 'github.com'"
             exit 1
           fi
-          echo "PASS"
+          echo "PASS: SSH config contains expected host entry"
+
+      - name: Assert SSH config file has correct permissions
+        run: |
+          PERMS=$(stat -c "%a" "$HOME/.ssh/config")
+          echo "actual permissions: $PERMS"
+          if [ "$PERMS" != "600" ]; then
+            echo "FAIL: expected permissions 600, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: SSH config file has correct permissions"

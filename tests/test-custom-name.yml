@@ -10,7 +10,7 @@ jobs:
       - name: Generate test SSH key pair
         id: keygen
         run: |
-          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -q
           PRIVATE_KEY=$(cat /tmp/test_key)
           echo "private_key<<EOF" >> $GITHUB_OUTPUT
           echo "$PRIVATE_KEY" >> $GITHUB_OUTPUT
@@ -20,26 +20,32 @@ jobs:
         uses: .
         with:
           key: ${{ steps.keygen.outputs.private_key }}
-          name: id_custom
-          known_hosts: unnecessary
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA0BdHfcOuW0oFjFWtiq5cymLCoLaqLfi3i/+V/rF0skBwQAA5kxqKL6RedVBqz/08noKUpQiqsl0XQe9/7NluSZXlpY2raAlcyDTAVmUZjjy5COLK3Rt1s1GnXn1s0ne/QQJKl1HzdbackMt8qfgzHoGaL7SnBZbcPalh5x+T+MdW7pH3PASeJCMGAQAA=="
+          name: id_deploy_key
 
-      - name: Assert SSH key was installed with custom name
+      - name: Assert custom-named SSH key file exists
         run: |
-          echo "Checking ~/.ssh/id_custom exists..."
-          if [ ! -f "$HOME/.ssh/id_custom" ]; then
-            echo "FAIL: ~/.ssh/id_custom not found"
+          echo "Checking ~/.ssh/id_deploy_key exists..."
+          if [ ! -f "$HOME/.ssh/id_deploy_key" ]; then
+            echo "FAIL: ~/.ssh/id_deploy_key not found"
             exit 1
           fi
-          echo "Checking ~/.ssh/id_rsa does NOT exist (default name not used)..."
+          echo "PASS: Custom-named SSH key file exists"
+
+      - name: Assert default key name does NOT exist
+        run: |
           if [ -f "$HOME/.ssh/id_rsa" ]; then
             echo "FAIL: ~/.ssh/id_rsa should not exist when custom name is used"
             exit 1
           fi
-          echo "Checking ~/.ssh/id_custom permissions..."
-          PERMS=$(stat -c "%a" "$HOME/.ssh/id_custom")
-          echo "Permissions: $PERMS"
+          echo "PASS: Default key name id_rsa does not exist (as expected)"
+
+      - name: Assert custom key file has correct permissions
+        run: |
+          PERMS=$(stat -c "%a" "$HOME/.ssh/id_deploy_key")
+          echo "actual permissions: $PERMS"
           if [ "$PERMS" != "600" ]; then
             echo "FAIL: expected permissions 600, got $PERMS"
             exit 1
           fi
-          echo "PASS"
+          echo "PASS: Custom SSH key file has correct permissions"

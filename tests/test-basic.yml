@@ -10,41 +10,43 @@ jobs:
       - name: Generate test SSH key pair
         id: keygen
         run: |
-          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -q
           PRIVATE_KEY=$(cat /tmp/test_key)
           echo "private_key<<EOF" >> $GITHUB_OUTPUT
           echo "$PRIVATE_KEY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          # Get the public key fingerprint for known_hosts (use localhost as placeholder)
-          ssh-keyscan github.com 2>/dev/null > /tmp/known_hosts_content || echo "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC..." > /tmp/known_hosts_content
-          KNOWN_HOSTS=$(cat /tmp/known_hosts_content)
-          echo "known_hosts<<EOF" >> $GITHUB_OUTPUT
-          echo "$KNOWN_HOSTS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - id: action
         uses: .
         with:
           key: ${{ steps.keygen.outputs.private_key }}
-          known_hosts: ${{ steps.keygen.outputs.known_hosts }}
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA0BdHfcOuW0oFjFWtiq5cymLCoLaqLfi3i/+V/rF0skBwQAA5kxqKL6RedVBqz/08noKUpQiqsl0XQe9/7NluSZXlpY2raAlcyDTAVmUZjjy5COLK3Rt1s1GnXn1s0ne/QQJKl1HzdbackMt8qfgzHoGaL7SnBZbcPalh5x+T+MdW7pH3PASeJCMGAQAA=="
+          name: id_rsa
 
-      - name: Assert SSH key was installed
+      - name: Assert SSH key file exists
         run: |
           echo "Checking ~/.ssh/id_rsa exists..."
           if [ ! -f "$HOME/.ssh/id_rsa" ]; then
             echo "FAIL: ~/.ssh/id_rsa not found"
             exit 1
           fi
-          echo "Checking ~/.ssh/id_rsa permissions..."
+          echo "PASS: SSH key file exists"
+
+      - name: Assert SSH key file has correct permissions
+        run: |
           PERMS=$(stat -c "%a" "$HOME/.ssh/id_rsa")
-          echo "Permissions: $PERMS"
+          echo "actual permissions: $PERMS"
           if [ "$PERMS" != "600" ]; then
             echo "FAIL: expected permissions 600, got $PERMS"
             exit 1
           fi
-          echo "Checking ~/.ssh/known_hosts exists..."
+          echo "PASS: SSH key file has correct permissions"
+
+      - name: Assert known_hosts file exists
+        run: |
           if [ ! -f "$HOME/.ssh/known_hosts" ]; then
             echo "FAIL: ~/.ssh/known_hosts not found"
             exit 1
           fi
-          echo "PASS"
+          echo "PASS: known_hosts file exists"
+          cat "$HOME/.ssh/known_hosts"
