@@ -12,7 +12,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | v2.6.1 | [`v2.6.1`](https://github.com/chainguard-actions/shimataro-ssh-key-action/tree/v2.6.1) | — |
 | v2.7.0 | [`v2.7.0`](https://github.com/chainguard-actions/shimataro-ssh-key-action/tree/v2.7.0) | — |
 | v2.8.0 | [`v2.8.0`](https://github.com/chainguard-actions/shimataro-ssh-key-action/tree/v2.8.0) | — |
-| v2.8.1 | [`v2.8.1`](https://github.com/chainguard-actions/shimataro-ssh-key-action/tree/v2.8.1) | — |
+| v2.8.1 | [`v2.8.1`](https://github.com/chainguard-actions/shimataro-ssh-key-action/tree/v2.8.1) | [`87a8f06`](https://github.com/shimataro/ssh-key-action/commit/87a8f067114a8ce263df83e9ed5c849953548bc3) |
 
 ## Privacy
 
