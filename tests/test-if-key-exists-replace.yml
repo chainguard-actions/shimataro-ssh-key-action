@@ -1,4 +1,4 @@
-name: Test SSH key installation with if_key_exists=ignore
+name: Test SSH key installation with if_key_exists=replace
 on:
   workflow_dispatch:
 jobs:
@@ -17,6 +17,9 @@ jobs:
           echo "TEST_SSH_KEY2<<EOF" >> $GITHUB_ENV
           cat /tmp/test_key2 >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
+          FINGERPRINT2=$(ssh-keygen -lf /tmp/test_key2 | awk '{print $2}')
+          echo "EXPECTED_FINGERPRINT=$FINGERPRINT2" >> $GITHUB_ENV
+          echo "Second key fingerprint: $FINGERPRINT2"
 
       - name: Install first SSH key
         uses: .
@@ -25,26 +28,20 @@ jobs:
           known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV+uzdX9/5ev6+bSX7QFuNKkIiC6Fn1kQmO7lcP4VkFJHrdIlH4Yz2CT8MsDQJkBljLMv/sh5haVty9IxWtherhYk5b5r6YXeiwivQLCx2/jaLiEeBzXH5QAzsn2y6szV7xzkHFZlue/Kbwv3m6w8GZI8+rQ=="
           if_key_exists: fail
 
-      - name: Capture first key fingerprint
-        run: |
-          FINGERPRINT=$(ssh-keygen -lf "$HOME/.ssh/id_rsa" | awk '{print $2}')
-          echo "FIRST_FINGERPRINT=$FINGERPRINT" >> $GITHUB_ENV
-          echo "First key fingerprint: $FINGERPRINT"
-
-      - name: Install second SSH key with if_key_exists=ignore (should not replace)
+      - name: Install second SSH key with if_key_exists=replace
         uses: .
         with:
           key: ${{ env.TEST_SSH_KEY2 }}
           known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV+uzdX9/5ev6+bSX7QFuNKkIiC6Fn1kQmO7lcP4VkFJHrdIlH4Yz2CT8MsDQJkBljLMv/sh5haVty9IxWtherhYk5b5r6YXeiwivQLCx2/jaLiEeBzXH5QAzsn2y6szV7xzkHFZlue/Kbwv3m6w8GZI8+rQ=="
-          if_key_exists: ignore
+          if_key_exists: replace
 
-      - name: Assert original key was preserved (not replaced)
+      - name: Assert key was replaced with second key
         run: |
           CURRENT_FINGERPRINT=$(ssh-keygen -lf "$HOME/.ssh/id_rsa" | awk '{print $2}')
-          echo "First fingerprint:   $FIRST_FINGERPRINT"
-          echo "Current fingerprint: $CURRENT_FINGERPRINT"
-          if [ "$CURRENT_FINGERPRINT" != "$FIRST_FINGERPRINT" ]; then
-            echo "FAIL: key was replaced when if_key_exists=ignore should have preserved it"
+          echo "Expected fingerprint: $EXPECTED_FINGERPRINT"
+          echo "Current fingerprint:  $CURRENT_FINGERPRINT"
+          if [ "$CURRENT_FINGERPRINT" != "$EXPECTED_FINGERPRINT" ]; then
+            echo "FAIL: key was not replaced; expected second key fingerprint"
             exit 1
           fi
-          echo "PASS: original key was preserved"
+          echo "PASS: key was replaced with second key"
