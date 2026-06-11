@@ -7,9 +7,10 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      # Generate a temporary test key to use as input
       - name: Generate test SSH key
         run: |
-          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          ssh-keygen -t ed25519 -f /tmp/test_key -N "" -C "test@example.com"
           echo "TEST_SSH_KEY<<EOF" >> $GITHUB_ENV
           cat /tmp/test_key >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
@@ -18,8 +19,8 @@ jobs:
         uses: .
         with:
           key: ${{ env.TEST_SSH_KEY }}
-          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV+uzdX9/5ev6+bSX7QFuNKkIiC6Fn1kQmO7lcP4VkFJHrdIlH4Yz2CT8MsDQJkBljLMv/sh5haVty9IxWtherhYk5b5r6YXeiwivQLCx2/jaLiEeBzXH5QAzsn2y6szV7xzkHFZlue/Kbwv3m6w8GZI8+rQ=="
-          if_key_exists: fail
+          known_hosts: |
+            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
 
       - name: Assert SSH key file exists
         run: |
@@ -28,22 +29,39 @@ jobs:
             echo "FAIL: ~/.ssh/id_rsa not found"
             exit 1
           fi
-          echo "PASS: ~/.ssh/id_rsa exists"
+          echo "PASS: SSH key file exists"
 
-      - name: Assert SSH key file has correct permissions
+      - name: Assert known_hosts file exists and contains entry
         run: |
-          PERMS=$(stat -c "%a" "$HOME/.ssh/id_rsa")
-          echo "actual permissions: $PERMS"
-          if [ "$PERMS" != "600" ]; then
-            echo "FAIL: expected permissions 600, got $PERMS"
-            exit 1
-          fi
-          echo "PASS: permissions are 600"
-
-      - name: Assert known_hosts file exists
-        run: |
+          echo "Checking ~/.ssh/known_hosts..."
           if [ ! -f "$HOME/.ssh/known_hosts" ]; then
             echo "FAIL: ~/.ssh/known_hosts not found"
             exit 1
           fi
-          echo "PASS: ~/.ssh/known_hosts exists"
+          if ! grep -q "github.com" "$HOME/.ssh/known_hosts"; then
+            echo "FAIL: github.com not found in known_hosts"
+            exit 1
+          fi
+          echo "PASS: known_hosts contains github.com entry"
+
+      - name: Assert SSH directory permissions
+        run: |
+          echo "Checking ~/.ssh permissions..."
+          PERMS=$(stat -c "%a" "$HOME/.ssh")
+          echo "~/.ssh permissions: $PERMS"
+          if [ "$PERMS" != "700" ]; then
+            echo "FAIL: expected 700, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: ~/.ssh has correct permissions"
+
+      - name: Assert key file permissions
+        run: |
+          echo "Checking ~/.ssh/id_rsa permissions..."
+          PERMS=$(stat -c "%a" "$HOME/.ssh/id_rsa")
+          echo "~/.ssh/id_rsa permissions: $PERMS"
+          if [ "$PERMS" != "600" ]; then
+            echo "FAIL: expected 600, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: key file has correct permissions"
