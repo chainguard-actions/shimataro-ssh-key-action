@@ -6,48 +6,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      # Generate a temporary test key to use as input
-      - name: Generate test SSH key
-        run: |
-          ssh-keygen -t ed25519 -f /tmp/test_key -N "" -C "test@example.com"
-          echo "TEST_SSH_KEY<<EOF" >> $GITHUB_ENV
-          cat /tmp/test_key >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
-      - id: action
+      - id: install-key
         uses: .
         with:
-          key: ${{ env.TEST_SSH_KEY }}
+          key: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAAbG9nZ2luLXBhc3N3b3JkAAAAFgAAAAEAAAAzAAAAC3NzaC1l
+            ZDI1NTE5AAAAIOMqLasseqaQ4n0Vx3jwyYfKAyJa/zIa3sBQjBISyndzAAAAsHRlc3Rr
+            ZXkAAAAAAAAAAAAAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIOMqLasseqaQ4n0Vx3jwyYfK
+            AyJa/zIa3sBQjBISyndzAAAAQHRlc3RrZXkAAAAAAAAAAAAAAAAzAAAAC3NzaC1lZDI1
+            NTE5AAAAIOMqLasseqaQ4n0Vx3jwyYfKAyJa/zIa3sBQjBISyndzAAAAQHRlc3Rr
+            ZXkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+            -----END OPENSSH PRIVATE KEY-----
           name: id_deploy
           known_hosts: |
-            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
-
-      - name: Assert custom-named SSH key file exists
+            github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+GsEAipoUau6X8jWxqFN+NkE6G5Wkym+pjCCBWYMnQumJeDy1pVDd+yivZjfdqapFaFxiihX0mpkU2czjfoRU10So1PEZFvTZz4SNztKzbuWyD0hDjkWrURG0dya4CAwEAAQ==
+      - name: Assert custom-named key file exists
         run: |
           echo "Checking ~/.ssh/id_deploy exists..."
           if [ ! -f "$HOME/.ssh/id_deploy" ]; then
             echo "FAIL: ~/.ssh/id_deploy not found"
             exit 1
           fi
-          echo "PASS: custom-named SSH key file exists"
-
-      - name: Assert default key name was NOT created
+          echo "PASS: custom-named key file exists"
+      - name: Assert default key file does NOT exist
         run: |
           echo "Checking ~/.ssh/id_rsa does NOT exist..."
           if [ -f "$HOME/.ssh/id_rsa" ]; then
             echo "FAIL: ~/.ssh/id_rsa should not exist when custom name is used"
             exit 1
           fi
-          echo "PASS: default key name not created"
-
+          echo "PASS: default key file correctly absent"
       - name: Assert custom key file permissions
         run: |
-          echo "Checking ~/.ssh/id_deploy permissions..."
           PERMS=$(stat -c "%a" "$HOME/.ssh/id_deploy")
-          echo "~/.ssh/id_deploy permissions: $PERMS"
-          if [ "$PERMS" != "600" ]; then
-            echo "FAIL: expected 600, got $PERMS"
+          echo "Key file permissions: $PERMS"
+          if [ "$PERMS" != "400" ]; then
+            echo "FAIL: expected permissions 400, got $PERMS"
             exit 1
           fi
-          echo "PASS: custom key file has correct permissions"
+          echo "PASS: key file has correct permissions"

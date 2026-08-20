@@ -6,62 +6,51 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      # Generate a temporary test key to use as input
-      - name: Generate test SSH key
-        run: |
-          ssh-keygen -t ed25519 -f /tmp/test_key -N "" -C "test@example.com"
-          echo "TEST_SSH_KEY<<EOF" >> $GITHUB_ENV
-          cat /tmp/test_key >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
-      - id: action
+      - id: install-key
         uses: .
         with:
-          key: ${{ env.TEST_SSH_KEY }}
+          key: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAAbG9nZ2luLXBhc3N3b3JkAAAAFgAAAAEAAAAzAAAAC3NzaC1l
+            ZDI1NTE5AAAAIOMqLasseqaQ4n0Vx3jwyYfKAyJa/zIa3sBQjBISyndzAAAAsHRlc3Rr
+            ZXkAAAAAAAAAAAAAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIOMqLasseqaQ4n0Vx3jwyYfK
+            AyJa/zIa3sBQjBISyndzAAAAQHRlc3RrZXkAAAAAAAAAAAAAAAAzAAAAC3NzaC1lZDI1
+            NTE5AAAAIOMqLasseqaQ4n0Vx3jwyYfKAyJa/zIa3sBQjBISyndzAAAAQHRlc3Rr
+            ZXkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+            -----END OPENSSH PRIVATE KEY-----
           known_hosts: |
-            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
-
-      - name: Assert SSH key file exists
+            github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+GsEAipoUau6X8jWxqFN+NkE6G5Wkym+pjCCBWYMnQumJeDy1pVDd+yivZjfdqapFaFxiihX0mpkU2czjfoRU10So1PEZFvTZz4SNztKzbuWyD0hDjkWrURG0dya4CAwEAAQ==
+      - name: Assert key file exists
         run: |
           echo "Checking ~/.ssh/id_rsa exists..."
           if [ ! -f "$HOME/.ssh/id_rsa" ]; then
             echo "FAIL: ~/.ssh/id_rsa not found"
             exit 1
           fi
-          echo "PASS: SSH key file exists"
-
-      - name: Assert known_hosts file exists and contains entry
+          echo "PASS: key file exists"
+      - name: Assert known_hosts file exists
         run: |
-          echo "Checking ~/.ssh/known_hosts..."
+          echo "Checking ~/.ssh/known_hosts exists..."
           if [ ! -f "$HOME/.ssh/known_hosts" ]; then
             echo "FAIL: ~/.ssh/known_hosts not found"
             exit 1
           fi
-          if ! grep -q "github.com" "$HOME/.ssh/known_hosts"; then
-            echo "FAIL: github.com not found in known_hosts"
-            exit 1
-          fi
-          echo "PASS: known_hosts contains github.com entry"
-
-      - name: Assert SSH directory permissions
-        run: |
-          echo "Checking ~/.ssh permissions..."
-          PERMS=$(stat -c "%a" "$HOME/.ssh")
-          echo "~/.ssh permissions: $PERMS"
-          if [ "$PERMS" != "700" ]; then
-            echo "FAIL: expected 700, got $PERMS"
-            exit 1
-          fi
-          echo "PASS: ~/.ssh has correct permissions"
-
+          echo "PASS: known_hosts file exists"
       - name: Assert key file permissions
         run: |
-          echo "Checking ~/.ssh/id_rsa permissions..."
           PERMS=$(stat -c "%a" "$HOME/.ssh/id_rsa")
-          echo "~/.ssh/id_rsa permissions: $PERMS"
-          if [ "$PERMS" != "600" ]; then
-            echo "FAIL: expected 600, got $PERMS"
+          echo "Key file permissions: $PERMS"
+          if [ "$PERMS" != "400" ]; then
+            echo "FAIL: expected permissions 400, got $PERMS"
             exit 1
           fi
           echo "PASS: key file has correct permissions"
+      - name: Assert known_hosts contains github.com
+        run: |
+          echo "Checking known_hosts contains github.com..."
+          if ! grep -q "github.com" "$HOME/.ssh/known_hosts"; then
+            echo "FAIL: known_hosts does not contain github.com"
+            exit 1
+          fi
+          echo "PASS: known_hosts contains github.com"

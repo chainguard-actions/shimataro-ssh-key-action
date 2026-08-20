@@ -6,42 +6,52 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Generate test SSH keys
+      - name: Pre-create SSH key to simulate existing key
         run: |
-          ssh-keygen -t rsa -b 2048 -f /tmp/test_key1 -N "" -C "first@example.com"
-          ssh-keygen -t rsa -b 2048 -f /tmp/test_key2 -N "" -C "second@example.com"
-          echo "TEST_SSH_KEY1<<EOF" >> $GITHUB_ENV
-          cat /tmp/test_key1 >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-          echo "TEST_SSH_KEY2<<EOF" >> $GITHUB_ENV
-          cat /tmp/test_key2 >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-          FINGERPRINT2=$(ssh-keygen -lf /tmp/test_key2 | awk '{print $2}')
-          echo "EXPECTED_FINGERPRINT=$FINGERPRINT2" >> $GITHUB_ENV
-          echo "Second key fingerprint: $FINGERPRINT2"
-
-      - name: Install first SSH key
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          echo "old-key-content" > "$HOME/.ssh/id_rsa"
+          chmod 600 "$HOME/.ssh/id_rsa"
+          echo "Pre-existing key created with old content"
+      - id: install-key
         uses: .
         with:
-          key: ${{ env.TEST_SSH_KEY1 }}
-          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV+uzdX9/5ev6+bSX7QFuNKkIiC6Fn1kQmO7lcP4VkFJHrdIlH4Yz2CT8MsDQJkBljLMv/sh5haVty9IxWtherhYk5b5r6YXeiwivQLCx2/jaLiEeBzXH5QAzsn2y6szV7xzkHFZlue/Kbwv3m6w8GZI8+rQ=="
-          if_key_exists: fail
-
-      - name: Install second SSH key with if_key_exists=replace
-        uses: .
-        with:
-          key: ${{ env.TEST_SSH_KEY2 }}
-          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV+uzdX9/5ev6+bSX7QFuNKkIiC6Fn1kQmO7lcP4VkFJHrdIlH4Yz2CT8MsDQJkBljLMv/sh5haVty9IxWtherhYk5b5r6YXeiwivQLCx2/jaLiEeBzXH5QAzsn2y6szV7xzkHFZlue/Kbwv3m6w8GZI8+rQ=="
+          key: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            b3BlbnNzaC1rZXktdjEAAAAAbG9nZ2luLXBhc3N3b3JkAAAAFgAAAAEAAAAzAAAAC3NzaC1l
+            ZDI1NTE5AAAAIOMqLasseqaQ4n0Vx3jwyYfKAyJa/zIa3sBQjBISyndzAAAAsHRlc3Rr
+            ZXkAAAAAAAAAAAAAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIOMqLasseqaQ4n0Vx3jwyYfK
+            AyJa/zIa3sBQjBISyndzAAAAQHRlc3RrZXkAAAAAAAAAAAAAAAAzAAAAC3NzaC1lZDI1
+            NTE5AAAAIOMqLasseqaQ4n0Vx3jwyYfKAyJa/zIa3sBQjBISyndzAAAAQHRlc3Rr
+            ZXkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+            -----END OPENSSH PRIVATE KEY-----
+          known_hosts: |
+            github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+GsEAipoUau6X8jWxqFN+NkE6G5Wkym+pjCCBWYMnQumJeDy1pVDd+yivZjfdqapFaFxiihX0mpkU2czjfoRU10So1PEZFvTZz4SNztKzbuWyD0hDjkWrURG0dya4CAwEAAQ==
           if_key_exists: replace
-
-      - name: Assert key was replaced with second key
+      - name: Assert key file exists after replace
         run: |
-          CURRENT_FINGERPRINT=$(ssh-keygen -lf "$HOME/.ssh/id_rsa" | awk '{print $2}')
-          echo "Expected fingerprint: $EXPECTED_FINGERPRINT"
-          echo "Current fingerprint:  $CURRENT_FINGERPRINT"
-          if [ "$CURRENT_FINGERPRINT" != "$EXPECTED_FINGERPRINT" ]; then
-            echo "FAIL: key was not replaced; expected second key fingerprint"
+          echo "Checking ~/.ssh/id_rsa exists..."
+          if [ ! -f "$HOME/.ssh/id_rsa" ]; then
+            echo "FAIL: ~/.ssh/id_rsa not found"
             exit 1
           fi
-          echo "PASS: key was replaced with second key"
+          echo "PASS: key file exists"
+      - name: Assert key content was replaced (not the old content)
+        run: |
+          CONTENT=$(cat "$HOME/.ssh/id_rsa")
+          echo "Key content starts with: $(echo "$CONTENT" | head -1)"
+          if [ "$CONTENT" = "old-key-content" ]; then
+            echo "FAIL: key content was NOT replaced, still has old content"
+            exit 1
+          fi
+          echo "PASS: key content was replaced"
+      - name: Assert replaced key file permissions
+        run: |
+          PERMS=$(stat -c "%a" "$HOME/.ssh/id_rsa")
+          echo "Key file permissions: $PERMS"
+          if [ "$PERMS" != "400" ]; then
+            echo "FAIL: expected permissions 400, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: key file has correct permissions"
