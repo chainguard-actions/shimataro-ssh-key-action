@@ -1,4 +1,4 @@
-name: Test SSH key installation with if_key_exists=ignore
+name: Test SSH key installation with if_key_exists=replace
 on:
   workflow_dispatch:
 jobs:
@@ -32,21 +32,21 @@ jobs:
           echo "FIRST_KEY_FP=$FP" >> $GITHUB_ENV
           echo "First key fingerprint: $FP"
 
-      - name: Install second SSH key with if_key_exists=ignore (should keep first key)
+      - name: Install second SSH key with if_key_exists=replace
         uses: .
         with:
           key: ${{ env.TEST_SSH_KEY2 }}
           name: id_rsa
           known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV+uzdX1gRD0g/0BH1Wm7Qs+PmV3BoQjkq4K+wiw3IqVtd+PiVDAZgtmX2x+h4GrKrQYwerqgkk5f4GDap5DCWZWDV5q5UXvYuwRmWsh5Sk+0L4y9DqwhbjnT0whteXyaRmHHx4sr5PpNHUrwkSEl2k="
-          if_key_exists: ignore
+          if_key_exists: replace
 
-      - name: Assert original key was preserved (not replaced)
+      - name: Assert key was replaced with the new one
         run: |
           CURRENT_FP=$(ssh-keygen -lf "$HOME/.ssh/id_rsa" | awk '{print $2}')
           echo "Current key fingerprint: $CURRENT_FP"
           echo "First key fingerprint:   $FIRST_KEY_FP"
-          if [ "$CURRENT_FP" != "$FIRST_KEY_FP" ]; then
-            echo "FAIL: key was replaced but if_key_exists=ignore should have kept the original"
+          if [ "$CURRENT_FP" = "$FIRST_KEY_FP" ]; then
+            echo "FAIL: key was NOT replaced but if_key_exists=replace should have replaced it"
             exit 1
           fi
-          echo "PASS: original key was preserved"
+          echo "PASS: key was replaced with the new key"
