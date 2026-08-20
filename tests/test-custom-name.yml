@@ -9,30 +9,48 @@ jobs:
 
       - name: Generate test SSH key
         run: |
-          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -q
+          ssh-keygen -t ed25519 -f /tmp/test_key -N "" -C "test@example.com"
           echo "TEST_SSH_KEY<<EOF" >> $GITHUB_ENV
           cat /tmp/test_key >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - id: action
+      - name: Install SSH key with custom name
+        id: action
         uses: .
         with:
           key: ${{ env.TEST_SSH_KEY }}
           name: id_deploy
-          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA1bkTJhCkYluMoUCpjcDWipaHAILoikn+LK9LpYwNamluuIrNWK00T2i5faeYnHzxiLRFr6f3XtARoJI9+4C3bQdp5wFMNoA1VE4/LX4geB8B8k/I4Q5Zj5ggAGDsHqmge8="
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+GCS8Ci4g1iFsml7sIA7T8s3EC3I/nuoZs1nYvXg+Gy4zy5rDUimski1GkVVOLBic4ws5jgPLe9ons8u6dp122BDTr3PKVmlVFn/1Xe0w1Dkj60="
+          if_key_exists: fail
 
       - name: Assert custom-named SSH key file exists
         run: |
-          if [ ! -f "$HOME/.ssh/id_deploy" ]; then
-            echo "FAIL: SSH key file ~/.ssh/id_deploy does not exist"
+          KEY_FILE="$HOME/.ssh/id_deploy"
+          echo "Checking for SSH key at: $KEY_FILE"
+          if [ ! -f "$KEY_FILE" ]; then
+            echo "FAIL: SSH key file not found at $KEY_FILE"
             exit 1
           fi
-          echo "PASS: SSH key file exists at ~/.ssh/id_deploy"
+          echo "PASS: Custom-named SSH key file exists"
 
-      - name: Assert default key name does not exist
+      - name: Assert default key name does NOT exist
         run: |
-          if [ -f "$HOME/.ssh/id_rsa" ]; then
-            echo "FAIL: default SSH key file ~/.ssh/id_rsa should not exist"
+          DEFAULT_KEY="$HOME/.ssh/id_rsa"
+          echo "Checking that default key does NOT exist at: $DEFAULT_KEY"
+          if [ -f "$DEFAULT_KEY" ]; then
+            echo "FAIL: default key file id_rsa should not exist when custom name is used"
             exit 1
           fi
-          echo "PASS: default key name id_rsa was not created"
+          echo "PASS: Default key file id_rsa does not exist (correct)"
+
+      - name: Assert custom key file permissions
+        run: |
+          KEY_FILE="$HOME/.ssh/id_deploy"
+          PERMS=$(stat -c "%a" "$KEY_FILE")
+          echo "Permissions: $PERMS"
+          # The action creates the key file with mode 0o400 (read-only for owner)
+          if [ "$PERMS" != "400" ]; then
+            echo "FAIL: expected permissions 400, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: SSH key file has correct permissions (400)"

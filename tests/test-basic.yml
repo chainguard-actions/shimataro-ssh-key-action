@@ -9,39 +9,51 @@ jobs:
 
       - name: Generate test SSH key
         run: |
-          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -q
+          ssh-keygen -t ed25519 -f /tmp/test_key -N "" -C "test@example.com"
           echo "TEST_SSH_KEY<<EOF" >> $GITHUB_ENV
           cat /tmp/test_key >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - id: action
+      - name: Install SSH key
+        id: action
         uses: .
         with:
           key: ${{ env.TEST_SSH_KEY }}
-          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA1bkTJhCkYluMoUCpjcDWipaHAILoikn+LK9LpYwNamluuIrNWK00T2i5faeYnHzxiLRFr6f3XtARoJI9+4C3bQdp5wFMNoA1VE4/LX4geB8B8k/I4Q5Zj5ggAGDsHqmge8="
+          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+GCS8Ci4g1iFsml7sIA7T8s3EC3I/nuoZs1nYvXg+Gy4zy5rDUimski1GkVVOLBic4ws5jgPLe9ons8u6dp122BDTr3PKVmlVFn/1Xe0w1Dkj60="
+          if_key_exists: fail
 
       - name: Assert SSH key file exists
         run: |
-          if [ ! -f "$HOME/.ssh/id_rsa" ]; then
-            echo "FAIL: SSH key file ~/.ssh/id_rsa does not exist"
+          KEY_FILE="$HOME/.ssh/id_rsa"
+          echo "Checking for SSH key at: $KEY_FILE"
+          if [ ! -f "$KEY_FILE" ]; then
+            echo "FAIL: SSH key file not found at $KEY_FILE"
             exit 1
           fi
-          echo "PASS: SSH key file exists at ~/.ssh/id_rsa"
+          echo "PASS: SSH key file exists"
 
-      - name: Assert SSH key file has correct permissions
+      - name: Assert SSH key file permissions
         run: |
-          PERMS=$(stat -c "%a" "$HOME/.ssh/id_rsa")
-          echo "actual permissions: $PERMS"
-          if [ "$PERMS" != "600" ]; then
-            echo "FAIL: expected permissions 600, got $PERMS"
+          KEY_FILE="$HOME/.ssh/id_rsa"
+          PERMS=$(stat -c "%a" "$KEY_FILE")
+          echo "Permissions: $PERMS"
+          # The action creates the key file with mode 0o400 (read-only for owner)
+          if [ "$PERMS" != "400" ]; then
+            echo "FAIL: expected permissions 400, got $PERMS"
             exit 1
           fi
-          echo "PASS: SSH key file has correct permissions"
+          echo "PASS: SSH key file has correct permissions (400)"
 
-      - name: Assert known_hosts file exists
+      - name: Assert known_hosts file exists and contains entry
         run: |
-          if [ ! -f "$HOME/.ssh/known_hosts" ]; then
-            echo "FAIL: known_hosts file does not exist"
+          KNOWN_HOSTS="$HOME/.ssh/known_hosts"
+          echo "Checking for known_hosts at: $KNOWN_HOSTS"
+          if [ ! -f "$KNOWN_HOSTS" ]; then
+            echo "FAIL: known_hosts file not found"
             exit 1
           fi
-          echo "PASS: known_hosts file exists"
+          if ! grep -q "github.com" "$KNOWN_HOSTS"; then
+            echo "FAIL: github.com not found in known_hosts"
+            exit 1
+          fi
+          echo "PASS: known_hosts file exists and contains github.com entry"
