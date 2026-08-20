@@ -1,4 +1,4 @@
-name: Test SSH key installation with if_key_exists=ignore
+name: Test SSH key installation with if_key_exists=replace
 on:
   workflow_dispatch:
 jobs:
@@ -16,16 +16,18 @@ jobs:
           echo "TEST_SSH_KEY2<<EOF" >> $GITHUB_ENV
           cat /tmp/test_key2 >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-          # Save the public key fingerprint of the first key for later comparison
+          # Save fingerprints for later comparison
           ssh-keygen -l -f /tmp/test_key1.pub | awk '{print $2}' > /tmp/key1_fingerprint.txt
-          cat /tmp/key1_fingerprint.txt
+          ssh-keygen -l -f /tmp/test_key2.pub | awk '{print $2}' > /tmp/key2_fingerprint.txt
+          echo "Key1 fingerprint: $(cat /tmp/key1_fingerprint.txt)"
+          echo "Key2 fingerprint: $(cat /tmp/key2_fingerprint.txt)"
       - name: Install first SSH key
         uses: .
         with:
           key: ${{ env.TEST_SSH_KEY1 }}
           known_hosts: "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
           name: id_rsa
-      - name: Record fingerprint of installed key
+      - name: Record fingerprint of first installed key
         run: |
           # Determine where the action wrote the key
           SSH_KEY_PATH="$HOME/.ssh/id_rsa"
@@ -34,23 +36,29 @@ jobs:
           fi
           echo "SSH_KEY_PATH=$SSH_KEY_PATH" >> $GITHUB_ENV
           # Key is created with 0o400 permissions, readable by owner
-          ssh-keygen -l -f "$SSH_KEY_PATH" | awk '{print $2}' > /tmp/installed_fingerprint.txt
-          echo "Installed key fingerprint: $(cat /tmp/installed_fingerprint.txt)"
+          FIRST_FP=$(ssh-keygen -l -f "$SSH_KEY_PATH" | awk '{print $2}')
+          echo "First installed key fingerprint: $FIRST_FP"
+          echo "FIRST_FP=$FIRST_FP" >> $GITHUB_ENV
       - id: action
         uses: .
         with:
           key: ${{ env.TEST_SSH_KEY2 }}
           known_hosts: "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
           name: id_rsa
-          if_key_exists: ignore
-      - name: Assert key was NOT replaced (original key still in place)
+          if_key_exists: replace
+      - name: Assert key was replaced with the new key
         run: |
           CURRENT_FP=$(ssh-keygen -l -f "$SSH_KEY_PATH" | awk '{print $2}')
-          ORIGINAL_FP=$(cat /tmp/installed_fingerprint.txt)
-          echo "Original fingerprint: $ORIGINAL_FP"
-          echo "Current fingerprint:  $CURRENT_FP"
-          if [ "$CURRENT_FP" != "$ORIGINAL_FP" ]; then
-            echo "FAIL: key was replaced but if_key_exists=ignore should have kept the original"
+          KEY2_FP=$(cat /tmp/key2_fingerprint.txt)
+          echo "First key fingerprint:   $FIRST_FP"
+          echo "Current key fingerprint: $CURRENT_FP"
+          echo "Key2 fingerprint:        $KEY2_FP"
+          if [ "$CURRENT_FP" = "$FIRST_FP" ]; then
+            echo "FAIL: key was NOT replaced but if_key_exists=replace should have replaced it"
             exit 1
           fi
-          echo "PASS: original key was preserved (not replaced)"
+          if [ "$CURRENT_FP" != "$KEY2_FP" ]; then
+            echo "FAIL: current key fingerprint does not match the second key"
+            exit 1
+          fi
+          echo "PASS: key was successfully replaced with the new key"

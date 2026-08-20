@@ -6,35 +6,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
+      - name: Generate test SSH key
+        run: |
+          ssh-keygen -t ed25519 -f /tmp/test_key -N "" -C "test@example.com"
+          echo "TEST_SSH_KEY<<EOF" >> $GITHUB_ENV
+          cat /tmp/test_key >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
       - id: action
         uses: .
         with:
-          key: |
-            -----BEGIN OPENSSH PRIVATE KEY-----
-            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-            QyNTUxOQAAACBY2fNtMBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFBQHMQAAAABY2fNt
-            MBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFBQHMQAAAAtzc2gtZWQyNTUxOQAAACBY2f
-            NtMBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFBQHMQAAAABY2fNtMBMHMQpbFBQHMQpb
-            FBQHMQpbFBQHMQpbFBQHMQAAAEBY2fNtMBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFB
-            QHMQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
-            -----END OPENSSH PRIVATE KEY-----
-          name: id_deploy
-          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV9wHgS38o8/Las9ifjdwbznuVqltzacInwbqEWWAWVpAoNa7PE0bzXpTZlcILec9Cb3dOdXynlAU+voTYmaWm51mKOwiBiA0X2OcjXzSlU0GrCSLjrhkZYv4/he3OhenV0ut+HXstvo9+IQ8/UfsmH5xGiWwwSDaOzizqe6bDZR4d8eVoENfpRM4U="
-
-      - name: Assert custom-named key file exists
+          key: ${{ env.TEST_SSH_KEY }}
+          known_hosts: "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+          name: id_deploy_key
+      - name: Assert custom-named SSH key file exists
         run: |
-          echo "Checking ~/.ssh/id_deploy exists..."
-          if [ ! -f "$HOME/.ssh/id_deploy" ]; then
-            echo "FAIL: ~/.ssh/id_deploy not found"
+          SSH_KEY_PATH="$HOME/.ssh/id_deploy_key"
+          if [ ! -f "$SSH_KEY_PATH" ] && [ -f "/root/.ssh/id_deploy_key" ]; then
+            SSH_KEY_PATH="/root/.ssh/id_deploy_key"
+          fi
+          if [ ! -f "$SSH_KEY_PATH" ]; then
+            echo "FAIL: SSH key file not found at $SSH_KEY_PATH"
+            ls -la "$HOME/.ssh/" 2>/dev/null || echo "(no .ssh dir at HOME)"
+            ls -la /root/.ssh/ 2>/dev/null || echo "(no .ssh dir at /root)"
             exit 1
           fi
-          echo "PASS: custom-named key file exists"
-
-      - name: Assert default key file does not exist
+          echo "PASS: Custom-named SSH key file exists at $SSH_KEY_PATH"
+      - name: Assert default key name was NOT created
         run: |
-          if [ -f "$HOME/.ssh/id_rsa" ]; then
-            echo "FAIL: ~/.ssh/id_rsa should not exist when custom name is used"
+          if [ -f "$HOME/.ssh/id_rsa" ] || [ -f "/root/.ssh/id_rsa" ]; then
+            echo "FAIL: default id_rsa file should not exist when custom name is used"
             exit 1
           fi
-          echo "PASS: default key file correctly absent"
+          echo "PASS: default id_rsa file does not exist"
+      - name: Assert custom key file permissions
+        run: |
+          SSH_KEY_PATH="$HOME/.ssh/id_deploy_key"
+          if [ ! -f "$SSH_KEY_PATH" ] && [ -f "/root/.ssh/id_deploy_key" ]; then
+            SSH_KEY_PATH="/root/.ssh/id_deploy_key"
+          fi
+          PERMS=$(stat -c "%a" "$SSH_KEY_PATH")
+          echo "permissions: $PERMS"
+          # Action creates key with mode 0o400 (read-only for owner)
+          if [ "$PERMS" != "400" ]; then
+            echo "FAIL: expected permissions 400, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: SSH key file has correct permissions (400)"

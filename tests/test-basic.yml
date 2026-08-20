@@ -6,44 +6,58 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
+      - name: Generate test SSH key
+        run: |
+          ssh-keygen -t ed25519 -f /tmp/test_key -N "" -C "test@example.com"
+          echo "TEST_SSH_KEY<<EOF" >> $GITHUB_ENV
+          cat /tmp/test_key >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
       - id: action
         uses: .
         with:
-          key: |
-            -----BEGIN OPENSSH PRIVATE KEY-----
-            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-            QyNTUxOQAAACBY2fNtMBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFBQHMQAAAABY2fNt
-            MBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFBQHMQAAAAtzc2gtZWQyNTUxOQAAACBY2f
-            NtMBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFBQHMQAAAABY2fNtMBMHMQpbFBQHMQpb
-            FBQHMQpbFBQHMQpbFBQHMQAAAEBY2fNtMBMHMQpbFBQHMQpbFBQHMQpbFBQHMQpbFB
-            QHMQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB
-            -----END OPENSSH PRIVATE KEY-----
-          known_hosts: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFV9wHgS38o8/Las9ifjdwbznuVqltzacInwbqEWWAWVpAoNa7PE0bzXpTZlcILec9Cb3dOdXynlAU+voTYmaWm51mKOwiBiA0X2OcjXzSlU0GrCSLjrhkZYv4/he3OhenV0ut+HXstvo9+IQ8/UfsmH5xGiWwwSDaOzizqe6bDZR4d8eVoENfpRM4U="
-
-      - name: Assert key file exists
+          key: ${{ env.TEST_SSH_KEY }}
+          known_hosts: "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+          name: id_rsa
+      - name: Assert SSH key file exists
         run: |
-          echo "Checking ~/.ssh/id_rsa exists..."
-          if [ ! -f "$HOME/.ssh/id_rsa" ]; then
-            echo "FAIL: ~/.ssh/id_rsa not found"
+          SSH_KEY_PATH="$HOME/.ssh/id_rsa"
+          # Under act Docker containers, action may write to /root/.ssh
+          if [ ! -f "$SSH_KEY_PATH" ] && [ -f "/root/.ssh/id_rsa" ]; then
+            SSH_KEY_PATH="/root/.ssh/id_rsa"
+          fi
+          if [ ! -f "$SSH_KEY_PATH" ]; then
+            echo "FAIL: SSH key file not found at $SSH_KEY_PATH"
+            ls -la "$HOME/.ssh/" 2>/dev/null || echo "(no .ssh dir at HOME)"
+            ls -la /root/.ssh/ 2>/dev/null || echo "(no .ssh dir at /root)"
             exit 1
           fi
-          echo "PASS: key file exists"
-
-      - name: Assert key file permissions
+          echo "PASS: SSH key file exists at $SSH_KEY_PATH"
+      - name: Assert known_hosts file exists and contains entry
         run: |
-          PERMS=$(stat -c "%a" "$HOME/.ssh/id_rsa")
-          echo "actual permissions: $PERMS"
-          if [ "$PERMS" != "600" ]; then
-            echo "FAIL: expected permissions 600, got $PERMS"
+          KH_PATH="$HOME/.ssh/known_hosts"
+          if [ ! -f "$KH_PATH" ] && [ -f "/root/.ssh/known_hosts" ]; then
+            KH_PATH="/root/.ssh/known_hosts"
+          fi
+          if [ ! -f "$KH_PATH" ]; then
+            echo "FAIL: known_hosts file not found"
             exit 1
           fi
-          echo "PASS: key file has correct permissions"
-
-      - name: Assert known_hosts file exists
-        run: |
-          if [ ! -f "$HOME/.ssh/known_hosts" ]; then
-            echo "FAIL: ~/.ssh/known_hosts not found"
+          if ! grep -q "github.com" "$KH_PATH"; then
+            echo "FAIL: known_hosts does not contain github.com entry"
             exit 1
           fi
-          echo "PASS: known_hosts file exists"
+          echo "PASS: known_hosts file exists and contains expected entry"
+      - name: Assert SSH key file permissions
+        run: |
+          SSH_KEY_PATH="$HOME/.ssh/id_rsa"
+          if [ ! -f "$SSH_KEY_PATH" ] && [ -f "/root/.ssh/id_rsa" ]; then
+            SSH_KEY_PATH="/root/.ssh/id_rsa"
+          fi
+          PERMS=$(stat -c "%a" "$SSH_KEY_PATH")
+          echo "permissions: $PERMS"
+          # Action creates key with mode 0o400 (read-only for owner)
+          if [ "$PERMS" != "400" ]; then
+            echo "FAIL: expected permissions 400, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: SSH key file has correct permissions (400)"

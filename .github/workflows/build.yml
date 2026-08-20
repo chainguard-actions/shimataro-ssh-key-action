@@ -1,0 +1,44 @@
+# https://help.github.com/en/articles/workflow-syntax-for-github-actions
+
+name: Build
+
+on:
+- push
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+        - windows-2019
+        - windows-2022
+        - macos-11
+        - macos-12
+        - ubuntu-20.04
+        - ubuntu-22.04
+        nodejs:
+        - 16
+      fail-fast: false
+    steps:
+    - name: Turn off auto-crlf
+      run: git config --global core.autocrlf false
+    - name: Checkout source codes
+      uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
+    - name: Install Node.js
+      uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
+      with:
+        node-version: ${{ matrix.nodejs }}
+    - name: Cache NPM
+      uses: ./.github/actions/cache-npm
+    - name: Install dependencies
+      run: npm ci
+    - name: Build
+      run: npm run build
+    - name: Exit if differ (forgot to commit dist dir?)
+      run: git diff --exit-code --quiet
+    - name: Verify
+      run: npm run verify
