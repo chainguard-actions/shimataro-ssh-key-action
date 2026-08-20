@@ -4,39 +4,53 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      HOME: /root
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Generate a test SSH key pair
+        run: |
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          echo "TEST_SSH_KEY<<SSHEOF" >> "$GITHUB_ENV"
+          cat /tmp/test_key >> "$GITHUB_ENV"
+          echo "SSHEOF" >> "$GITHUB_ENV"
+
       - id: action
+        name: Install SSH key with custom name
         uses: .
         with:
-          key: |
-            -----BEGIN OPENSSH PRIVATE KEY-----
-            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-            QyNTUxOQAAACBY2fNDFJpVTKMKMCMFHFJMhpMkuH3jBMTqBjhDRmFnbAAAAJiMjMCYjI
-            zAAAAAtzc2gtZWQyNTUxOQAAACBY2fNDFJpVTKMKMCMFHFJMhpMkuH3jBMTqBjhDRmFn
-            bAAAAEDummy+TestKey+NotReal+ForCIOnly+Y2fNDFJpVTKMKMCMFHFJMhpMkuH3jBM
-            TqBjhDRmFnbAAAADXRlc3RAZXhhbXBsZQECAwQF
-            -----END OPENSSH PRIVATE KEY-----
-          known_hosts: |
-            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
-          name: id_deploy
-          if_key_exists: replace
+          key: ${{ env.TEST_SSH_KEY }}
+          name: id_ed25519
+          known_hosts: unnecessary
 
-      - name: Assert custom-named key file exists
+      - name: Assert custom-named SSH key file was created
         run: |
-          echo "Checking ~/.ssh/id_deploy exists..."
-          if [ ! -f "$HOME/.ssh/id_deploy" ]; then
-            echo "FAIL: ~/.ssh/id_deploy not found"
+          SSH_DIR="/root/.ssh"
+          echo "SSH_DIR=$SSH_DIR"
+          ls -la "$SSH_DIR" || true
+          if [ ! -f "$SSH_DIR/id_ed25519" ]; then
+            echo "FAIL: $SSH_DIR/id_ed25519 does not exist"
             exit 1
           fi
-          echo "PASS: custom-named key file exists"
+          echo "PASS: $SSH_DIR/id_ed25519 exists"
 
-      - name: Assert default key name was not created
+      - name: Assert default key name was NOT created
         run: |
-          echo "Checking ~/.ssh/id_rsa does NOT exist (custom name was used)..."
-          if [ -f "$HOME/.ssh/id_rsa" ]; then
-            echo "FAIL: ~/.ssh/id_rsa should not exist when custom name is used"
+          SSH_DIR="/root/.ssh"
+          if [ -f "$SSH_DIR/id_rsa" ]; then
+            echo "FAIL: $SSH_DIR/id_rsa should not exist when custom name is used"
             exit 1
           fi
-          echo "PASS: default key name not created"
+          echo "PASS: id_rsa was not created (correct)"
+
+      - name: Assert custom key file has correct permissions
+        run: |
+          SSH_DIR="/root/.ssh"
+          PERMS=$(stat -c "%a" "$SSH_DIR/id_ed25519")
+          echo "permissions: $PERMS"
+          if [ "$PERMS" != "400" ]; then
+            echo "FAIL: expected permissions 400, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: permissions are 400"

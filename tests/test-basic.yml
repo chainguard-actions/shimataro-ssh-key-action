@@ -4,48 +4,76 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      HOME: /root
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Generate a test SSH key pair
+        run: |
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          echo "TEST_SSH_KEY<<SSHEOF" >> "$GITHUB_ENV"
+          cat /tmp/test_key >> "$GITHUB_ENV"
+          echo "SSHEOF" >> "$GITHUB_ENV"
+
+      - name: Debug environment
+        run: |
+          echo "HOME=$HOME"
+          echo "USER=$(whoami)"
+          echo "node version: $(node --version 2>/dev/null || echo 'not found')"
+          ls -la /root/.ssh 2>/dev/null || echo "/root/.ssh does not exist yet"
+
       - id: action
+        name: Install SSH key
         uses: .
         with:
-          key: |
-            -----BEGIN OPENSSH PRIVATE KEY-----
-            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-            QyNTUxOQAAACBY2fNDFJpVTKMKMCMFHFJMhpMkuH3jBMTqBjhDRmFnbAAAAJiMjMCYjI
-            zAAAAAtzc2gtZWQyNTUxOQAAACBY2fNDFJpVTKMKMCMFHFJMhpMkuH3jBMTqBjhDRmFn
-            bAAAAEDummy+TestKey+NotReal+ForCIOnly+Y2fNDFJpVTKMKMCMFHFJMhpMkuH3jBM
-            TqBjhDRmFnbAAAADXRlc3RAZXhhbXBsZQECAwQF
-            -----END OPENSSH PRIVATE KEY-----
-          known_hosts: |
-            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
-          name: id_rsa
-          if_key_exists: replace
+          key: ${{ env.TEST_SSH_KEY }}
+          known_hosts: unnecessary
 
-      - name: Assert key file exists
+      - name: Debug after action
         run: |
-          echo "Checking ~/.ssh/id_rsa exists..."
-          if [ ! -f "$HOME/.ssh/id_rsa" ]; then
-            echo "FAIL: ~/.ssh/id_rsa not found"
+          echo "HOME=$HOME"
+          ls -la /root/.ssh 2>/dev/null || echo "/root/.ssh does not exist"
+          ls -la "$HOME/.ssh" 2>/dev/null || echo "$HOME/.ssh does not exist"
+          find / -name "known_hosts" 2>/dev/null | head -20 || true
+
+      - name: Assert SSH key file was created
+        run: |
+          SSH_DIR="/root/.ssh"
+          echo "SSH_DIR=$SSH_DIR"
+          ls -la "$SSH_DIR" || true
+          if [ ! -f "$SSH_DIR/id_rsa" ]; then
+            echo "FAIL: $SSH_DIR/id_rsa does not exist"
             exit 1
           fi
-          echo "PASS: key file exists"
+          echo "PASS: $SSH_DIR/id_rsa exists"
 
-      - name: Assert known_hosts file exists
+      - name: Assert SSH key file has correct permissions
         run: |
-          echo "Checking ~/.ssh/known_hosts exists..."
-          if [ ! -f "$HOME/.ssh/known_hosts" ]; then
-            echo "FAIL: ~/.ssh/known_hosts not found"
+          SSH_DIR="/root/.ssh"
+          PERMS=$(stat -c "%a" "$SSH_DIR/id_rsa")
+          echo "permissions: $PERMS"
+          if [ "$PERMS" != "400" ]; then
+            echo "FAIL: expected permissions 400, got $PERMS"
             exit 1
           fi
-          echo "PASS: known_hosts file exists"
+          echo "PASS: permissions are 400"
 
-      - name: Assert known_hosts contains github.com
+      - name: Assert known_hosts file was created
         run: |
-          echo "Checking known_hosts contains github.com..."
-          if ! grep -q "github.com" "$HOME/.ssh/known_hosts"; then
-            echo "FAIL: github.com not found in known_hosts"
+          SSH_DIR="/root/.ssh"
+          if [ ! -f "$SSH_DIR/known_hosts" ]; then
+            echo "FAIL: $SSH_DIR/known_hosts does not exist"
             exit 1
           fi
-          echo "PASS: github.com found in known_hosts"
+          echo "PASS: $SSH_DIR/known_hosts exists"
+
+      - name: Assert known_hosts contains github.com entry
+        run: |
+          SSH_DIR="/root/.ssh"
+          cat "$SSH_DIR/known_hosts"
+          if ! grep -q "github.com" "$SSH_DIR/known_hosts"; then
+            echo "FAIL: known_hosts does not contain github.com entry"
+            exit 1
+          fi
+          echo "PASS: known_hosts contains github.com entry"

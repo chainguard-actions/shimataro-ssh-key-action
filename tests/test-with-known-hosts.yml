@@ -1,0 +1,63 @@
+name: Test SSH key installation with explicit known_hosts
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      HOME: /root
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Generate a test SSH key pair
+        run: |
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          echo "TEST_SSH_KEY<<SSHEOF" >> "$GITHUB_ENV"
+          cat /tmp/test_key >> "$GITHUB_ENV"
+          echo "SSHEOF" >> "$GITHUB_ENV"
+
+      - id: action
+        name: Install SSH key with explicit known_hosts
+        uses: .
+        with:
+          key: ${{ env.TEST_SSH_KEY }}
+          known_hosts: "example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+
+      - name: Assert known_hosts file was created
+        run: |
+          SSH_DIR="/root/.ssh"
+          echo "SSH_DIR=$SSH_DIR"
+          if [ ! -f "$SSH_DIR/known_hosts" ]; then
+            echo "FAIL: $SSH_DIR/known_hosts does not exist"
+            exit 1
+          fi
+          echo "PASS: $SSH_DIR/known_hosts exists"
+
+      - name: Assert known_hosts contains github.com (built-in entry)
+        run: |
+          SSH_DIR="/root/.ssh"
+          cat "$SSH_DIR/known_hosts"
+          if ! grep -q "github.com" "$SSH_DIR/known_hosts"; then
+            echo "FAIL: known_hosts does not contain built-in github.com entry"
+            exit 1
+          fi
+          echo "PASS: known_hosts contains github.com entry"
+
+      - name: Assert known_hosts contains example.com (custom entry)
+        run: |
+          SSH_DIR="/root/.ssh"
+          if ! grep -q "example.com" "$SSH_DIR/known_hosts"; then
+            echo "FAIL: known_hosts does not contain example.com entry"
+            cat "$SSH_DIR/known_hosts"
+            exit 1
+          fi
+          echo "PASS: known_hosts contains example.com entry"
+
+      - name: Assert SSH key file was created
+        run: |
+          SSH_DIR="/root/.ssh"
+          if [ ! -f "$SSH_DIR/id_rsa" ]; then
+            echo "FAIL: $SSH_DIR/id_rsa does not exist"
+            exit 1
+          fi
+          echo "PASS: $SSH_DIR/id_rsa exists"

@@ -1,4 +1,4 @@
-name: Test SSH key installation with if_key_exists=ignore
+name: Test SSH key installation with if_key_exists=replace
 on:
   workflow_dispatch:
 jobs:
@@ -26,28 +26,36 @@ jobs:
           cp /root/.ssh/id_rsa /tmp/existing_key_content.txt
 
       - id: action
-        name: Install SSH key with if_key_exists=ignore
+        name: Install SSH key with if_key_exists=replace
         uses: .
         with:
           key: ${{ env.TEST_SSH_KEY }}
           known_hosts: unnecessary
-          if_key_exists: ignore
+          if_key_exists: replace
 
-      - name: Assert action succeeded (did not fail)
+      - name: Assert action succeeded
         run: |
           echo "PASS: action completed without error"
 
-      - name: Assert existing key was NOT replaced
+      - name: Assert key was replaced with new key
         run: |
           SSH_DIR="/root/.ssh"
           echo "SSH_DIR=$SSH_DIR"
-          # Compare file content - if key was replaced, content would differ
-          if ! diff -q "$SSH_DIR/id_rsa" /tmp/existing_key_content.txt > /dev/null 2>&1; then
-            echo "FAIL: key was replaced but should have been ignored"
-            echo "Original key:"
-            cat /tmp/existing_key_content.txt
-            echo "Current key:"
-            cat "$SSH_DIR/id_rsa"
+          ls -la "$SSH_DIR" || true
+          # The new key content should differ from the original
+          if diff -q "$SSH_DIR/id_rsa" /tmp/existing_key_content.txt > /dev/null 2>&1; then
+            echo "FAIL: key was NOT replaced but should have been"
             exit 1
           fi
-          echo "PASS: existing key was preserved (ignored)"
+          echo "PASS: key was replaced with new key"
+
+      - name: Assert new key file has correct permissions
+        run: |
+          SSH_DIR="/root/.ssh"
+          PERMS=$(stat -c "%a" "$SSH_DIR/id_rsa")
+          echo "permissions: $PERMS"
+          if [ "$PERMS" != "400" ]; then
+            echo "FAIL: expected permissions 400, got $PERMS"
+            exit 1
+          fi
+          echo "PASS: permissions are 400"

@@ -1,0 +1,44 @@
+name: Test SSH key installation with if_key_exists=fail (default)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      HOME: /root
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Generate a test SSH key pair
+        run: |
+          ssh-keygen -t rsa -b 2048 -f /tmp/test_key -N "" -C "test@example.com"
+          echo "TEST_SSH_KEY<<SSHEOF" >> "$GITHUB_ENV"
+          cat /tmp/test_key >> "$GITHUB_ENV"
+          echo "SSHEOF" >> "$GITHUB_ENV"
+
+      - name: Pre-install a different SSH key to simulate existing key
+        run: |
+          mkdir -p /root/.ssh
+          chmod 700 /root/.ssh
+          ssh-keygen -t rsa -b 2048 -f /root/.ssh/id_rsa -N "" -C "existing@example.com"
+          chmod 400 /root/.ssh/id_rsa
+
+      - id: action
+        name: Install SSH key (should fail because key already exists)
+        uses: .
+        continue-on-error: true
+        with:
+          key: ${{ env.TEST_SSH_KEY }}
+          known_hosts: unnecessary
+          if_key_exists: fail
+
+      - name: Assert action failed as expected
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: expected action to fail when key exists and if_key_exists=fail, but got outcome '$OUTCOME'"
+            exit 1
+          fi
+          echo "PASS: action correctly failed when key already exists"
