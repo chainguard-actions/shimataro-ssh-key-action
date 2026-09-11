@@ -8,11 +8,11 @@ runs:
     # https://github.com/actions/cache/blob/master/examples.md#node---npm
     # https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-output-parameter
     - name: Get NPM cache directory
-      run: echo "NPM_CACHE_DIRECTORY=$(npm config get cache)" >> $GITHUB_ENV # use "github.env" instead of "github.output"; if use "github.output", "Warning: Input required and not supplied: path" is displayed on post-process
-      shell: pwsh # use PowerShell; Bash doesn't work on Windows because the value of "github.env" is like "D:\\a\\_temp\\_runner_file_commands\\set_env_XXX".
+      run: echo "NPM_CACHE_DIRECTORY=$(npm config get cache)" >> "$GITHUB_ENV" # use "github.env" instead of "github.output"; if use "github.output", "Warning: Input required and not supplied: path" is displayed on post-process
+      shell: pwsh # use PowerShell; Bash doesn't work on Windows because the value of "github.env" is like "D:\a\_temp\_runner_file_commands\set_env_XXX".
 
     - name: Get Node.js version
-      run: echo "NODEJS_VERSION=$(node -v)" >> $GITHUB_ENV
+      run: echo "NODEJS_VERSION=$(node -v)" >> "$GITHUB_ENV"
       shell: pwsh
 
     - name: Cache NPM modules
