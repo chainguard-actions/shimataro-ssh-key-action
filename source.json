@@ -4,8 +4,13 @@
   "version": "v2.8.0",
   "commit_sha": "6b84f2e793b32fa0b03a379cadadec75cc539391",
   "url": "https://github.com/shimataro/ssh-key-action",
-  "policy_sha": "d636be7e43ef829af6e853da6b3c7566db9f72fe",
+  "policy_sha": "374911c4be584df24e6da57af2d990570ef0f859",
   "test_policy_sha": "843adf9e4b8f85d0c08b27b9d0b09dd094b54702",
   "test_agent_version": "2",
-  "harden_agent_version": "2"
+  "harden_agent_version": "2",
+  "dist_artifact": {
+    "gcs_uri": "gs://patch-actions-node-artifacts/dist-artifacts/shimataro/ssh-key-action/v2.8.0/sha256-cbb50394b4fde7c664ee4e619d1aea1859b0921410038e6350490b9a7a8d370c.tar.gz",
+    "sha256": "cbb50394b4fde7c664ee4e619d1aea1859b0921410038e6350490b9a7a8d370c",
+    "size_bytes": 982923
+  }
 }
